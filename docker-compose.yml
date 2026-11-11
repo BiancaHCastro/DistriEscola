@@ -1,0 +1,301 @@
+services:
+  # -------------------------------------------------------------------------
+  # Banco de Dados Relacional Principal (PostgreSQL)
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: distrischool-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: distrischool_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d distrischool_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Broker de Mensageria Assíncrona (RabbitMQ com painel de gerenciamento)
+  # -------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: distrischool-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - "5672:5672"     # Porta do protocolo AMQP
+      - "15672:15672"   # Painel Web de Gerenciamento RabbitMQ
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Autenticação e Segurança (login-service)
+  # -------------------------------------------------------------------------
+  login-service:
+    build:
+      context: ./backend/login
+      dockerfile: Dockerfile
+    container_name: distrischool-login-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Gestão de Alunos (aluno-service)
+  # -------------------------------------------------------------------------
+  aluno-service:
+    build:
+      context: ./backend/aluno-service
+      dockerfile: Dockerfile
+    container_name: distrischool-aluno-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_PORT=8082
+      - SPRING_DATASOURCE_HOST=postgres
+      - SPRING_DATASOURCE_PORT=5432
+      - SPRING_DATASOURCE_DB=distrischool_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Gestão de Professores (teacher-service)
+  # -------------------------------------------------------------------------
+  teacher-service:
+    build:
+      context: ./backend/teacher-service
+      dockerfile: Dockerfile
+    container_name: distrischool-teacher-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - SERVER_PORT=8083
+      - SPRING_DATASOURCE_HOST=postgres
+      - SPRING_DATASOURCE_PORT=5432
+      - SPRING_DATASOURCE_DB=distrischool_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Gestão de Turmas e Disciplinas (class-service)
+  # -------------------------------------------------------------------------
+  class-service:
+    build:
+      context: ./backend/class-service
+      dockerfile: Dockerfile
+    container_name: distrischool-class-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - SERVER_PORT=8085
+      - SPRING_DATASOURCE_HOST=postgres
+      - SPRING_DATASOURCE_PORT=5432
+      - SPRING_DATASOURCE_DB=distrischool_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - TEACHER_SERVICE_HOST=teacher-service
+      - TEACHER_SERVICE_PORT=8083
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Matrículas N:N (enrollment-service)
+  # -------------------------------------------------------------------------
+  enrollment-service:
+    build:
+      context: ./backend/enrollment-service
+      dockerfile: Dockerfile
+    container_name: distrischool-enrollment-service
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - SERVER_PORT=8086
+      - SPRING_DATASOURCE_HOST=postgres
+      - SPRING_DATASOURCE_PORT=5432
+      - SPRING_DATASOURCE_DB=distrischool_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - ALUNO_SERVICE_HOST=aluno-service
+      - ALUNO_SERVICE_PORT=8082
+      - CLASS_SERVICE_HOST=class-service
+      - CLASS_SERVICE_PORT=8085
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Frequência e Presenças (attendance-service via RabbitMQ)
+  # -------------------------------------------------------------------------
+  attendance-service:
+    build:
+      context: ./backend/attendance-service
+      dockerfile: Dockerfile
+    container_name: distrischool-attendance-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - SERVER_PORT=8084
+      - SPRING_DATASOURCE_HOST=postgres
+      - SPRING_DATASOURCE_PORT=5432
+      - SPRING_DATASOURCE_DB=distrischool_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Microsserviço de Notas e Avaliações (grade-service via RabbitMQ)
+  # -------------------------------------------------------------------------
+  grade-service:
+    build:
+      context: ./backend/grade-service
+      dockerfile: Dockerfile
+    container_name: distrischool-grade-service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      - SERVER_PORT=8087
+      - SPRING_DATASOURCE_HOST=postgres
+      - SPRING_DATASOURCE_PORT=5432
+      - SPRING_DATASOURCE_DB=distrischool_db
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - distrischool-net
+
+  # -------------------------------------------------------------------------
+  # Roteador Central e Ponto Único de Entrada (Spring Cloud API Gateway)
+  # -------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: distrischool-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - distrischool-net
+
+volumes:
+  postgres_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+networks:
+  distrischool-net:
+    driver: bridge

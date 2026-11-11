@@ -1,0 +1,82 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        # Serviço de Autenticação / Login
+        - id: login-service
+          uri: http://login-service:8081
+          predicates:
+            - Path=/api/auth/**, /api/users/**
+
+        # Serviço de Gestão de Alunos (Acadêmico)
+        - id: aluno-service
+          uri: http://aluno-service:8082
+          predicates:
+            - Path=/api/students/**
+
+        # Serviço de Gestão de Professores (Administrativo)
+        - id: teacher-service
+          uri: http://teacher-service:8083
+          predicates:
+            - Path=/api/teachers/**
+
+        # Serviço de Turmas e Disciplinas (Administrativo)
+        - id: class-service
+          uri: http://class-service:8085
+          predicates:
+            - Path=/api/classes/**
+
+        # Serviço de Matrículas N:N (Acadêmico)
+        - id: enrollment-service
+          uri: http://enrollment-service:8086
+          predicates:
+            - Path=/api/enrollments/**
+
+        # Serviço de Registro de Presenças / Frequência (Acadêmico)
+        - id: attendance-service
+          uri: http://attendance-service:8084
+          predicates:
+            - Path=/api/attendance/**, /api/academic/**
+
+        # Serviço de Gestão de Notas (Acadêmico)
+        - id: grade-service
+          uri: http://grade-service:8087
+          predicates:
+            - Path=/api/grades/**
+
+      # Configuração Global de CORS no API Gateway
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://localhost:5173"
+              - "http://127.0.0.1:3000"
+              - "http://127.0.0.1:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always

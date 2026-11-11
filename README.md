@@ -1,11 +1,20 @@
-<div align="center">
+# 🎓 DistriSchool - Plataforma de Gestão Escolar Distribuída
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+O **DistriSchool** é um sistema de gestão escolar baseado em uma arquitetura de microsserviços. Ele foi projetado para ser escalável e tolerante a falhas.
 
-  <h1>Built with AI Studio</h2>
+## 🛠 Tecnologias Utilizadas
+* **Backend:** Java 17, Spring Boot (Web, Data JPA, Security)
+* **Frontend:** React + Vite + Thymeleaf
+* **Banco de Dados:** PostgreSQL (Relacional) e MongoDB (NoSQL)
+* **Mensageria:** Apache Kafka
+* **Infraestrutura:** Docker e Kubernetes (K8s)
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🏗 Estrutura do Repositório (Monorepo)
+* `/backend` - Contém os microsserviços Spring Boot.
+* `/frontend` - Aplicação web em React.
+* `docker-compose.yml` - Infraestrutura local (Bancos de Dados, Kafka, Zookeeper).
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## 🚀 Como Executar o Ambiente Local
 
-</div>
+**Pré-requisitos:** Docker Desktop, Java 17 e Node.js.
+

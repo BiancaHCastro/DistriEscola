@@ -1,0 +1,6 @@
+{
+  "name": "DistriSchool",
+  "description": "Sistema web de Gestão Escolar baseado em Computação Distribuída, microsserviços Spring Boot, RabbitMQ e PostgreSQL.",
+  "permissions": [],
+  "capabilities": []
+}
