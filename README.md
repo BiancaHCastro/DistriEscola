@@ -3,16 +3,18 @@
 O **DistriSchool** é um sistema de gestão escolar baseado em uma arquitetura de microsserviços. Ele foi projetado para ser escalável e tolerante a falhas.
 
 ## 🛠 Tecnologias Utilizadas
-* **Backend:** Java 17, Spring Boot (Web, Data JPA, Security)
-* **Frontend:** React + Vite + Thymeleaf
-* **Banco de Dados:** PostgreSQL (Relacional) e MongoDB (NoSQL)
-* **Mensageria:** Apache Kafka
-* **Infraestrutura:** Docker e Kubernetes (K8s)
+* **Backend:** Java 17, Spring Boot 3 (Web, Data JPA, Security, Actuator)
+* **Frontend:** React + Vite + Tailwind CSS
+* **Banco de Dados:** PostgreSQL 16 (Relacional com schemas isolados por microsserviço)
+* **Mensageria:** RabbitMQ 3.13 (Gerenciamento AMQP para eventos assíncronos)
+* **Infraestrutura:** Docker e Docker Compose (com limites de memória configurados)
+
+> **Nota sobre o MongoDB:** O MongoDB **não** está sendo utilizado pelo sistema. Toda a persistência é gerenciada com isolamento no PostgreSQL (`distrischool_db`), o que reduz consideravelmente o consumo de RAM da sua máquina.
 
 ## 🏗 Estrutura do Repositório (Monorepo)
-* `/backend` - Contém os microsserviços Spring Boot.
+* `/backend` - Contém os 8 microsserviços Spring Boot.
 * `/frontend` - Aplicação web em React.
-* `docker-compose.yml` - Infraestrutura local (Bancos de Dados, Kafka, Zookeeper).
+* `docker-compose.yml` - Orquestração local (PostgreSQL, RabbitMQ, Gateway e serviços).
 
 ## 🚀 Como Executar o Ambiente Local
 
