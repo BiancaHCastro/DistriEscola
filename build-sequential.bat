@@ -1,5 +1,6 @@
 @echo off
-echo === DistriSchool: Build e Execucao dos Microsservicos ===
+echo === DistriSchool: Build Sequencial e Execucao (Windows) ===
+
 echo 1. Limpando cache do Docker builder...
 docker builder prune -f
 

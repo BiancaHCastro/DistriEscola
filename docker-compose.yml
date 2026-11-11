@@ -61,6 +61,12 @@ services:
       - "8081:8081"
     environment:
       - SERVER_PORT=8081
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
       interval: 10s
@@ -88,6 +94,12 @@ services:
       - SPRING_DATASOURCE_DB=distrischool_db
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=password
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,6 +130,12 @@ services:
       - SPRING_DATASOURCE_DB=distrischool_db
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=password
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,6 +168,12 @@ services:
       - SPRING_DATASOURCE_PASSWORD=password
       - TEACHER_SERVICE_HOST=teacher-service
       - TEACHER_SERVICE_PORT=8083
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -184,6 +208,12 @@ services:
       - ALUNO_SERVICE_PORT=8082
       - CLASS_SERVICE_HOST=class-service
       - CLASS_SERVICE_PORT=8085
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -218,6 +248,12 @@ services:
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=admin
       - SPRING_RABBITMQ_PASSWORD=password
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -254,6 +290,12 @@ services:
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=admin
       - SPRING_RABBITMQ_PASSWORD=password
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -282,6 +324,12 @@ services:
     environment:
       - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=docker
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy

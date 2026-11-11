@@ -1,7 +1,12 @@
+.git
+.gitignore
 .gradle
+build/
 build
-out
-bin
-.idea
-.vscode
+out/
+bin/
+node_modules/
+docs/
+.idea/
+.vscode/
 *.log
