@@ -1,53 +1,57 @@
 import React from 'react';
 
-export default function ConnectionBadge({ isFallback, onRetry }) {
+export default function ConnectionBadge({ isConnected, onRetry, isChecking }) {
   return (
     <div
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: '8px',
-        padding: '6px 12px',
+        padding: '6px 14px',
         borderRadius: '20px',
         fontSize: '13px',
-        fontWeight: '500',
-        backgroundColor: isFallback ? '#fef3c7' : '#dcfce7',
-        color: isFallback ? '#92400e' : '#166534',
-        border: `1px solid ${isFallback ? '#fcd34d' : '#86efac'}`,
+        fontWeight: '600',
+        backgroundColor: isConnected ? '#dcfce7' : '#fee2e2',
+        color: isConnected ? '#15803d' : '#b91c1c',
+        border: `1px solid ${isConnected ? '#86efac' : '#fca5a5'}`,
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
       }}
     >
       <span
         style={{
-          width: '8px',
-          height: '8px',
+          width: '9px',
+          height: '9px',
           borderRadius: '50%',
-          backgroundColor: isFallback ? '#f59e0b' : '#22c55e',
-          display: 'inline-block'
+          backgroundColor: isConnected ? '#22c55e' : '#ef4444',
+          display: 'inline-block',
+          boxShadow: isConnected ? '0 0 6px rgba(34, 197, 94, 0.6)' : '0 0 6px rgba(239, 68, 68, 0.6)'
         }}
       />
       <span>
-        {isFallback
-          ? 'Modo Fallback / Resiliência Ativo'
-          : 'API Gateway Conectado (Porta 8080)'}
+        {isChecking
+          ? 'Verificando conexão...'
+          : isConnected
+          ? 'Servidores Online (Gateway :8080)'
+          : 'Servidores Offline / Desconectados'}
       </span>
-      {isFallback && onRetry && (
+      {(!isConnected || onRetry) && (
         <button
           type="button"
           onClick={onRetry}
+          disabled={isChecking}
           style={{
             background: 'transparent',
             border: 'none',
-            color: '#b45309',
+            color: isConnected ? '#15803d' : '#b91c1c',
             textDecoration: 'underline',
-            cursor: 'pointer',
+            cursor: isChecking ? 'wait' : 'pointer',
             padding: '0 4px',
             fontSize: '12px',
             fontWeight: '600'
           }}
-          title="Tentar conexão com http://localhost:8080/api"
+          title="Tentar reconectar com http://localhost:8080/api"
         >
-          Reconectar
+          {isChecking ? 'Checando...' : 'Reconectar'}
         </button>
       )}
     </div>

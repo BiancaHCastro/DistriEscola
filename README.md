@@ -24,11 +24,15 @@ O **DistriSchool** é um sistema de gestão escolar baseado em uma arquitetura d
 - **Linux / macOS:**
   ```bash
   chmod +x build-sequential.sh
-  ./build-sequential.sh
+  ./build-sequential.sh        # Constrói e sobe todos os serviços
+  # OU para economia máxima de RAM em máquinas com pouca memória:
+  ./build-sequential.sh core   # Sobe apenas o essencial (PostgreSQL, RabbitMQ, Gateway, Login, Aluno, Teacher)
   ```
 - **Windows:**
   ```cmd
-  build-sequential.bat
+  build-sequential.bat         rem Constrói e sobe todos os serviços
+  rem OU para economia de memória:
+  build-sequential.bat core    rem Sobe apenas os serviços essenciais
   ```
 
 ### Opção 2: Manualmente via terminal
@@ -37,9 +41,9 @@ O **DistriSchool** é um sistema de gestão escolar baseado em uma arquitetura d
 docker builder prune -f
 
 # 2. Constrói as imagens sequencialmente (baixo uso de RAM e CPU)
-docker compose build --parallel=false
+docker compose build login-service aluno-service teacher-service api-gateway
 
-# 3. Sobe todos os contêineres em segundo plano
+# 3. Sobe os contêineres em segundo plano
 docker compose up -d
 ```
 

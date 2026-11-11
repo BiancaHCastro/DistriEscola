@@ -24,13 +24,21 @@ export default function App() {
   const [attendanceStatus, setAttendanceStatus] = useState({});
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isFallback, setIsFallback] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [connectionError, setConnectionError] = useState(null);
+  const [gatewayUrl, setGatewayUrl] = useState(() => apiService.getGatewayUrl());
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // Monitora alterações no status de conexão (Fallback / Gateway)
+  // Monitora alterações no status de conexão com o Gateway
   useEffect(() => {
     const unsubscribe = apiService.subscribe((status) => {
-      setIsFallback(status.isFallback);
+      setIsConnected(status.isConnected);
+      if (!status.isConnected) {
+        setConnectionError(status.error || 'Não foi possível conectar ao API Gateway (:8080)');
+      } else {
+        setConnectionError(null);
+      }
     });
     return unsubscribe;
   }, []);
@@ -39,9 +47,10 @@ export default function App() {
   const fetchStudents = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, isFallback: fallbackActive } = await apiService.getStudents();
+      const { data } = await apiService.getStudents();
       setStudents(data);
-      setIsFallback(fallbackActive);
+      setIsConnected(true);
+      setConnectionError(null);
 
       const initial = {};
       data.forEach((s) => {
@@ -49,7 +58,8 @@ export default function App() {
       });
       setAttendanceStatus((prev) => ({ ...initial, ...prev }));
     } catch (err) {
-      console.warn('Falha ao carregar alunos:', err);
+      setIsConnected(false);
+      setConnectionError(err.message);
     } finally {
       setLoading(false);
     }
@@ -58,47 +68,51 @@ export default function App() {
   // Busca professores (teacher-service)
   const fetchTeachers = useCallback(async () => {
     try {
-      const { data, isFallback: fallbackActive } = await apiService.getTeachers();
+      const { data } = await apiService.getTeachers();
       setTeachers(data);
-      setIsFallback(fallbackActive);
+      setIsConnected(true);
     } catch (err) {
-      console.warn('Falha ao carregar professores:', err);
+      setIsConnected(false);
+      setConnectionError(err.message);
     }
   }, []);
 
   // Busca turmas/disciplinas (class-service)
   const fetchClasses = useCallback(async () => {
     try {
-      const { data, isFallback: fallbackActive } = await apiService.getClasses();
+      const { data } = await apiService.getClasses();
       setClasses(data);
-      setIsFallback(fallbackActive);
+      setIsConnected(true);
       if (data.length > 0 && !turmaId) {
         setTurmaId(data[0].codigo);
       }
     } catch (err) {
-      console.warn('Falha ao carregar turmas:', err);
+      setIsConnected(false);
+      setConnectionError(err.message);
     }
   }, [turmaId]);
 
   // Busca matrículas N:N (enrollment-service)
   const fetchEnrollments = useCallback(async () => {
     try {
-      const { data, isFallback: fallbackActive } = await apiService.getEnrollments();
+      const { data } = await apiService.getEnrollments();
       setEnrollments(data);
-      setIsFallback(fallbackActive);
+      setIsConnected(true);
     } catch (err) {
-      console.warn('Falha ao carregar matrículas:', err);
+      setIsConnected(false);
+      setConnectionError(err.message);
     }
   }, []);
 
   // Busca notas (grade-service)
   const fetchGrades = useCallback(async () => {
     try {
-      const { data, isFallback: fallbackActive } = await apiService.getGrades(turmaId);
+      const { data } = await apiService.getGrades(turmaId);
       setGrades(data);
-      setIsFallback(fallbackActive);
+      setIsConnected(true);
     } catch (err) {
-      console.warn('Falha ao carregar notas:', err);
+      setIsConnected(false);
+      setConnectionError(err.message);
     }
   }, [turmaId]);
 
@@ -106,24 +120,39 @@ export default function App() {
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, isFallback: fallbackActive } = await apiService.getReport(turmaId);
+      const { data } = await apiService.getReport(turmaId);
       setReport(data);
-      setIsFallback(fallbackActive);
+      setIsConnected(true);
     } catch (err) {
-      console.warn('Falha ao obter relatório:', err);
+      setIsConnected(false);
+      setConnectionError(err.message);
     } finally {
       setLoading(false);
     }
   }, [turmaId]);
 
-  useEffect(() => {
-    fetchStudents();
-    fetchTeachers();
-    fetchClasses();
-    fetchEnrollments();
-    fetchGrades();
+  // Carrega todos os dados e testa conectividade
+  const refreshAll = useCallback(async () => {
+    setIsChecking(true);
+    try {
+      await Promise.allSettled([
+        fetchStudents(),
+        fetchTeachers(),
+        fetchClasses(),
+        fetchEnrollments(),
+        fetchGrades()
+      ]);
+    } finally {
+      setIsChecking(false);
+    }
   }, [fetchStudents, fetchTeachers, fetchClasses, fetchEnrollments, fetchGrades]);
 
+  // Carga inicial
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
+  // Sincroniza dados na troca de abas
   useEffect(() => {
     if (activeTab === 'relatorio') {
       fetchReport();
@@ -180,9 +209,7 @@ export default function App() {
       if (result.success) {
         setMessage({
           type: 'success',
-          text: result.isFallback
-            ? 'Chamada registrada no Fallback local! (Evento RabbitMQ simulado com sucesso)'
-            : 'Chamada registrada no API Gateway e evento emitido no RabbitMQ (attendance.recorded) com sucesso!'
+          text: 'Chamada registrada no attendance-service e evento publicado no RabbitMQ (attendance.recorded) com sucesso!'
         });
         fetchReport();
       }
@@ -196,11 +223,11 @@ export default function App() {
   const handleSaveStudent = async (studentForm, isEditing) => {
     setLoading(true);
     try {
-      const result = await apiService.saveStudent(studentForm, isEditing);
+      await apiService.saveStudent(studentForm, isEditing);
       const actionText = isEditing ? 'Aluno atualizado com sucesso' : 'Aluno cadastrado com sucesso';
       setMessage({
         type: 'success',
-        text: result.isFallback ? `${actionText} (Fallback Local)!` : `${actionText}!`
+        text: `${actionText} no banco de dados!`
       });
       await fetchStudents();
       return true;
@@ -217,7 +244,7 @@ export default function App() {
     setLoading(true);
     try {
       await apiService.deleteStudent(id);
-      setMessage({ type: 'success', text: 'Aluno excluído com sucesso!' });
+      setMessage({ type: 'success', text: 'Aluno excluído com sucesso do banco de dados!' });
       await fetchStudents();
       await fetchEnrollments();
     } catch (err) {
@@ -230,11 +257,11 @@ export default function App() {
   const handleSaveTeacher = async (teacherForm, isEditing) => {
     setLoading(true);
     try {
-      const result = await apiService.saveTeacher(teacherForm, isEditing);
+      await apiService.saveTeacher(teacherForm, isEditing);
       const actionText = isEditing ? 'Professor atualizado com sucesso' : 'Professor cadastrado com sucesso';
       setMessage({
         type: 'success',
-        text: result.isFallback ? `${actionText} (Fallback Local)!` : `${actionText}!`
+        text: `${actionText} no banco de dados!`
       });
       await fetchTeachers();
       await fetchClasses();
@@ -252,7 +279,7 @@ export default function App() {
     setLoading(true);
     try {
       await apiService.deleteTeacher(id);
-      setMessage({ type: 'success', text: 'Professor excluído com sucesso!' });
+      setMessage({ type: 'success', text: 'Professor excluído com sucesso do banco de dados!' });
       await fetchTeachers();
       await fetchClasses();
     } catch (err) {
@@ -265,11 +292,11 @@ export default function App() {
   const handleSaveClass = async (classForm, isEditing) => {
     setLoading(true);
     try {
-      const result = await apiService.saveClass(classForm, isEditing);
+      await apiService.saveClass(classForm, isEditing);
       const actionText = isEditing ? 'Turma atualizada com sucesso' : 'Turma criada com sucesso';
       setMessage({
         type: 'success',
-        text: result.isFallback ? `${actionText} (Fallback Local)!` : `${actionText}!`
+        text: `${actionText} no banco de dados!`
       });
       await fetchClasses();
       return true;
@@ -286,7 +313,7 @@ export default function App() {
     setLoading(true);
     try {
       await apiService.deleteClass(id);
-      setMessage({ type: 'success', text: 'Turma excluída com sucesso!' });
+      setMessage({ type: 'success', text: 'Turma excluída com sucesso do banco de dados!' });
       await fetchClasses();
       await fetchEnrollments();
     } catch (err) {
@@ -299,12 +326,10 @@ export default function App() {
   const handleEnrollStudent = async (alunoId, classId) => {
     setLoading(true);
     try {
-      const result = await apiService.enrollStudent(alunoId, classId);
+      await apiService.enrollStudent(alunoId, classId);
       setMessage({
         type: 'success',
-        text: result.isFallback
-          ? 'Matrícula efetuada com sucesso (Fallback Local / Validação N:N ativa)!'
-          : 'Matrícula efetuada com sucesso via API Gateway!'
+        text: 'Matrícula efetuada com sucesso no enrollment-service!'
       });
       await fetchEnrollments();
       return true;
@@ -321,7 +346,7 @@ export default function App() {
     setLoading(true);
     try {
       await apiService.cancelEnrollment(id);
-      setMessage({ type: 'success', text: 'Matrícula cancelada com sucesso!' });
+      setMessage({ type: 'success', text: 'Matrícula cancelada com sucesso no banco de dados!' });
       await fetchEnrollments();
     } catch (err) {
       setMessage({ type: 'error', text: `Erro ao cancelar matrícula: ${err.message}` });
@@ -333,12 +358,10 @@ export default function App() {
   const handleSaveGrade = async (gradeForm) => {
     setLoading(true);
     try {
-      const result = await apiService.saveGrade(gradeForm);
+      await apiService.saveGrade(gradeForm);
       setMessage({
         type: 'success',
-        text: result.isFallback
-          ? 'Nota salva no Fallback local! (Evento RabbitMQ simulado)'
-          : 'Nota salva no API Gateway e evento emitido no RabbitMQ (grade.posted) com sucesso!'
+        text: 'Nota salva no grade-service e evento publicado no RabbitMQ (grade.posted) com sucesso!'
       });
       await fetchGrades();
       return true;
@@ -358,15 +381,9 @@ export default function App() {
           <span>Plataforma de Gestão Escolar Distribuída</span>
           <div style={{ marginTop: '8px' }}>
             <ConnectionBadge
-              isFallback={isFallback}
-              onRetry={() => {
-                fetchStudents();
-                fetchTeachers();
-                fetchClasses();
-                fetchEnrollments();
-                fetchGrades();
-                if (activeTab === 'relatorio') fetchReport();
-              }}
+              isConnected={isConnected}
+              isChecking={isChecking}
+              onRetry={refreshAll}
             />
           </div>
         </div>
@@ -422,6 +439,85 @@ export default function App() {
           </button>
         </nav>
       </header>
+
+      {/* Banner explicativo quando o Docker estiver offline */}
+      {!isConnected && (
+        <div style={{
+          backgroundColor: '#fef2f2',
+          border: '1px solid #f87171',
+          borderRadius: '8px',
+          padding: '14px 18px',
+          margin: '16px auto',
+          maxWidth: '1200px',
+          color: '#991b1b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+        }}>
+          <div>
+            <strong>⚠️ Servidores Docker Desconectados ou Iniciando:</strong>
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#7f1d1d' }}>
+              O frontend está em <strong>modo estrito</strong> comunicando diretamente com o backend real.
+              Para interagir com o sistema, certifique-se de que os contêineres estão em execução executando no terminal:
+              <code style={{ background: '#fee2e2', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', fontWeight: 'bold' }}>
+                ./build-sequential.sh
+              </code> ou <code style={{ background: '#fee2e2', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                docker compose up -d
+              </code>.
+            </p>
+            {connectionError && (
+              <small style={{ display: 'block', marginTop: '4px', color: '#b91c1c', fontStyle: 'italic' }}>
+                Detalhe técnico: {connectionError}
+              </small>
+            )}
+            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: '#7f1d1d', fontWeight: '500' }}>URL do Gateway:</span>
+              <input
+                type="text"
+                value={gatewayUrl}
+                onChange={(e) => setGatewayUrl(e.target.value)}
+                onBlur={() => {
+                  apiService.setGatewayUrl(gatewayUrl);
+                  refreshAll();
+                }}
+                placeholder="http://localhost:8080/api"
+                style={{
+                  fontSize: '12px',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #fca5a5',
+                  backgroundColor: '#ffffff',
+                  color: '#1f2937',
+                  width: '260px'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: '#991b1b' }}>
+                (Padrão: <code>http://localhost:8080/api</code>)
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={isChecking}
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: isChecking ? 'wait' : 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {isChecking ? 'Verificando...' : '🔄 Testar Conexão'}
+          </button>
+        </div>
+      )}
 
       {message.text && (
         <div className={`alert alert-${message.type}`}>
